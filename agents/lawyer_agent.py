@@ -4,8 +4,13 @@ from typing import Dict, Any, List
 from .agent_base import AgentBase
 
 class LawyerAgent(AgentBase):
-    def __init__(self, config: Dict[str, Any]):
-        super().__init__(config)
+    def __init__(self, config: Dict[str, Any] = None, llm_provider: str = "Groq"):
+        super().__init__("lawyer", llm_provider)
+        self.config = config or {
+            "name": "Advocate",
+            "experience": "10 years",
+            "specialization": "Civil Law",
+        }
         
     def _get_system_prompt(self) -> str:
         """Get the system prompt for the lawyer"""

@@ -72,6 +72,8 @@ class CourtAgent(AgentBase):
             messages.append({"role": "user", "content": context["prompt"]})
 
             response = self.llm.generate_response(messages)
+            if isinstance(response, dict):
+                response = response.get("response") or response.get("error") or ""
 
             response_time = (datetime.now() - start_time).total_seconds()
             self.performance_metrics["response_time"] = (

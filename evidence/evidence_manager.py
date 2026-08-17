@@ -256,4 +256,12 @@ class EvidenceManager:
         
         self.evidence_log[case_id] = data["evidence_log"]
         self.chain_of_custody[case_id] = data["chain_of_custody"]
-        self.authentication_records[case_id] = data["authentication_records"] 
+        self.authentication_records[case_id] = data["authentication_records"]
+
+    def assess_context_similarity(self, evidence_text: str, case_data: Dict[str, Any], evidence_name: str = "Exhibit") -> Dict[str, Any]:
+        """Score uploaded evidence against case context and the legal knowledge base."""
+        from rag.pipeline import LegalRAGPipeline
+
+        pipeline = LegalRAGPipeline()
+        report = pipeline.score_evidence(evidence_text, case=case_data, evidence_name=evidence_name)
+        return report.to_dict() 

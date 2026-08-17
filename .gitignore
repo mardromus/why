@@ -39,6 +39,9 @@ Thumbs.db
 *.log
 .env
 .env.local
+.streamlit/secrets.toml
 api_keys/
 data/transcripts/
-data/case_files/ 
+data/case_files/
+data/uploads/
+.rag_cache/ 

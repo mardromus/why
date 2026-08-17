@@ -1,125 +1,106 @@
 # utils/tts.py
 
+from __future__ import annotations
+
 import os
 import tempfile
 from typing import Dict, Any, Optional
-from gtts import gTTS
-import base64
-import time
-import pygame
 
-# pip install gtts requests
+try:
+    from gtts import gTTS
+except ImportError:
+    gTTS = None
+
 
 class TTSEngine:
-    def __init__(self):
-        try:
-            # Use dummy audio driver if specified
-            if os.environ.get("SDL_AUDIODRIVER") == "dummy":
-                print("Using dummy audio driver for pygame.")
-            pygame.mixer.init()
-            self.audio_available = True
-            self.temp_dir = tempfile.mkdtemp()
-            self.voice_settings = {
-                "judge": {"language": "en", "slow": False},
-                "plaintiff": {"language": "en", "slow": False},
-                "defendant": {"language": "en", "slow": False},
-                "witness": {"language": "en", "slow": False}
-            }
-            print("TTSEngine initialized successfully")
-        except Exception as e:
-            print(f"Error initializing TTSEngine: {str(e)}")
-            self.audio_available = False
+    """Generate speech with gTTS. Playback uses Streamlit audio on Cloud."""
 
-    def generate_tts(self, text: str, role: str = "judge", language: str = "en") -> str:
-        """Generate TTS audio for the given text"""
+    def __init__(self):
+        self.temp_dir = tempfile.mkdtemp(prefix="lexorion_tts_")
+        self.voice_settings = {
+            "judge": {"language": "en", "slow": False},
+            "plaintiff": {"language": "en", "slow": False},
+            "defendant": {"language": "en", "slow": False},
+            "witness": {"language": "en", "slow": False},
+        }
+        self.playback_available = False
+        if os.environ.get("LEX_ENABLE_PYGAME_AUDIO") == "1":
+            try:
+                import pygame
+
+                pygame.mixer.init()
+                self.playback_available = True
+            except Exception:
+                self.playback_available = False
+
+    def generate_tts(self, text: str, role: str = "judge", language: str = "en") -> Optional[str]:
+        if not gTTS or not text or not str(text).strip():
+            return None
+        settings = self.voice_settings.get(role, {"language": language, "slow": False})
         try:
-            print(f"Generating TTS for role: {role}, language: {language}")
-            print(f"Text length: {len(text)}")
-            
-            settings = self.voice_settings.get(role, {"language": language, "slow": False})
-            print(f"Using settings: {settings}")
-            
-            tts = gTTS(text=text, lang=settings["language"], slow=settings["slow"])
-            
-            # Save to temporary file
-            filename = f"tts_{role}_{hash(text)}.mp3"
+            tts = gTTS(text=str(text)[:4500], lang=settings.get("language", language), slow=settings.get("slow", False))
+            filename = f"tts_{role}_{abs(hash(text))}.mp3"
             filepath = os.path.join(self.temp_dir, filename)
-            print(f"Saving to: {filepath}")
-            
             tts.save(filepath)
-            print("TTS file saved successfully")
-            
             return filepath
-        except Exception as e:
-            print(f"Error generating TTS: {str(e)}")
-            print(f"Error type: {type(e)}")
-            import traceback
-            print(f"Traceback: {traceback.format_exc()}")
+        except Exception as exc:
+            print(f"Error generating TTS: {exc}")
+            return None
+
+    def generate_bytes(self, text: str, role: str = "judge", language: str = "en") -> Optional[bytes]:
+        filepath = self.generate_tts(text, role=role, language=language)
+        if not filepath:
+            return None
+        try:
+            with open(filepath, "rb") as handle:
+                return handle.read()
+        except Exception:
             return None
 
     def play_audio(self, filepath: str) -> bool:
-        """Play the generated audio file"""
+        if not self.playback_available:
+            return False
         try:
-            print(f"Playing audio from: {filepath}")
+            import pygame
+            import time
+
             pygame.mixer.music.load(filepath)
             pygame.mixer.music.play()
             while pygame.mixer.music.get_busy():
                 time.sleep(0.1)
-            print("Audio playback completed")
             return True
-        except Exception as e:
-            print(f"Error playing audio: {str(e)}")
-            print(f"Error type: {type(e)}")
-            import traceback
-            print(f"Traceback: {traceback.format_exc()}")
+        except Exception as exc:
+            print(f"Error playing audio: {exc}")
             return False
 
     def speak(self, text: str, role: str = "judge", language: str = "en") -> bool:
-        """Generate and play TTS audio for the given text."""
+        audio = self.generate_bytes(text, role=role, language=language)
+        if not audio:
+            return False
         try:
-            print(f"Speaking text for role: {role}")
-            print(f"Text: {text[:100]}...")  # Print first 100 chars
-            
+            import streamlit as st
+
+            st.audio(audio, format="audio/mp3")
+            return True
+        except Exception:
             filepath = self.generate_tts(text, role=role, language=language)
-            if filepath:
-                return self.play_audio(filepath)
-            return False
-        except Exception as e:
-            print(f"Error in speak method: {str(e)}")
-            print(f"Error type: {type(e)}")
-            import traceback
-            print(f"Traceback: {traceback.format_exc()}")
-            return False
+            return bool(filepath and self.play_audio(filepath))
 
     def cleanup(self):
-        """Clean up temporary files"""
         try:
             for filename in os.listdir(self.temp_dir):
-                filepath = os.path.join(self.temp_dir, filename)
-                os.remove(filepath)
+                os.remove(os.path.join(self.temp_dir, filename))
             os.rmdir(self.temp_dir)
-        except Exception as e:
-            print(f"Error cleaning up TTS files: {str(e)}")
+        except Exception as exc:
+            print(f"Error cleaning up TTS files: {exc}")
 
     def set_voice_settings(self, role: str, settings: Dict[str, Any]):
-        """Set voice settings for a specific role"""
         self.voice_settings[role] = settings
 
     def get_available_languages(self) -> Dict[str, str]:
-        """Get available languages for TTS"""
-        return {
-            "en": "English",
-            "hi": "Hindi"
-        }
+        return {"en": "English", "hi": "Hindi"}
 
-# ------------------ Convenience Functions ------------------ #
-
-tts_engine = TTSEngine()
 
 def generate_tts(text, language="en", voice="default"):
-    """Generate speech audio file from text."""
-    return tts_engine.generate_tts(text, language, voice)
-
-def cleanup():
-    """Delete temporary audio files."""
-    tts_engine.cleanup()
+    engine = TTSEngine()
+    return engine.generate_tts(text, role=voice, language=language)

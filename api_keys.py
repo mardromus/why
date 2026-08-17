@@ -1,4 +1,4 @@
-# API Keys Configuration
-GROQ_API_KEY = "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"  # Replace with your actual Groq API key
+# Local fallback only. Prefer GROQ_API_KEY in the environment or Streamlit secrets.
+import os
 
-# Other API keys can be added here 
+GROQ_API_KEY = os.getenv("GROQ_API_KEY", "YOUR_GROQ_API_KEY_HERE")

@@ -109,7 +109,8 @@ class WitnessAgent(AgentBase):
         Format the response as a structured analysis."""
         
         analysis = groq_api.generate_response(prompt)
-        return self._parse_analysis(analysis)
+        text = analysis.get("response", str(analysis)) if isinstance(analysis, dict) else str(analysis)
+        return self._parse_analysis(text)
     
     def prepare_for_examination(self, case_context: Dict[str, Any]) -> Dict[str, Any]:
         """Prepare the witness for examination"""
@@ -130,7 +131,14 @@ class WitnessAgent(AgentBase):
         Format the response as preparation guidelines."""
         
         preparation = groq_api.generate_response(prompt)
-        return self._parse_preparation(preparation)
+        text = preparation.get("response", str(preparation)) if isinstance(preparation, dict) else str(preparation)
+        return self._parse_preparation(text)
+
+    def _parse_analysis(self, analysis: str) -> Dict[str, Any]:
+        return {"raw_analysis": analysis or "", "credibility_score": self.credibility}
+
+    def _parse_preparation(self, preparation: str) -> Dict[str, Any]:
+        return {"guidelines": preparation or "", "background": self.background}
     
     def _assess_background_relevance(self, case_data: Dict[str, Any]) -> Dict[str, Any]:
         """Assess how relevant the witness's background is to the case"""
